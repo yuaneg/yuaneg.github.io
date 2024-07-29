@@ -1,5 +1,5 @@
 #!/bin/bash
-pushd ~/yuaneg.github.io
+cd /root/yuaneg.github.io
 ipold=`grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' index.html`
 port=4998
 # Try to connect to the specified host and port using telnet
