@@ -1,4 +1,5 @@
 #!/bin/bash
+pushd ~/yuaneg.github.io
 ipold=`grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' index.html`
 port=4998
 # Try to connect to the specified host and port using telnet
@@ -8,7 +9,6 @@ if [[ $output == *"Connected to"* ]]; then
     echo "Port $port on $ipold is open"
 else
     echo "Port $port on $ipold is closed or unreachable"
-    pushd ~/yuaneg.github.io
     git reset --hard HEAD
     git pull
     curl -k  -c cookie.txt  --location --request POST 'http://192.168.1.1:8080/login.cgi' \
