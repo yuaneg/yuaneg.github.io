@@ -6,7 +6,7 @@ port=4998
 output=$( (echo quit | timeout 5  telnet $ipold $port) 2>&1 )
 # Check the output of the telnet command
 if [[ $output == *"Connected to"* ]]; then
-    echo "Port $port on $ipold is open"
+    echo "$port $ipold "
 else
     echo "Port $port on $ipold is closed or unreachable"
     git reset --hard HEAD
