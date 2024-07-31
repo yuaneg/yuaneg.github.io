@@ -40,5 +40,3 @@ function changeIp() {
     fi
 }
 changeIp
-
-
