@@ -1,0 +1,21 @@
+payload:
+  # List of IP check URLs
+  - DOMAIN,whatismyip.akamai.com
+  - DOMAIN,api64.ipify.org
+  - DOMAIN,ifconfig.io
+  - DOMAIN,ipinfo.io
+  - DOMAIN,checkip.spdyn.de
+  - DOMAIN,ipleak.net
+  - DOMAIN,icanhazip.com
+  - DOMAIN,ident.me
+  - DOMAIN,ip.nnev.de
+  - DOMAIN,wtfismyip.com
+  - DOMAIN,api.seeip.org
+  - DOMAIN,ip.changeip.com
+  - DOMAIN,ipv4.ipleak.net
+  - DOMAIN,api.ipify.org
+  - DOMAIN,ipv4.icanhazip.com
+  - DOMAIN,v4.ident.me
+  - DOMAIN,ip4.nnev.de
+  - DOMAIN,ipv4.wtfismyip.com
+  - DOMAIN,ipv4.seeip.org
