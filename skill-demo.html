@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Skill 组装与解析 · 流程图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "SF Mono", Monaco, Consolas, monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    min-height: 100vh;
+    padding: 24px;
+    font-size: 14px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #f0f6fc; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid #30363d;
+    background: #0d1117;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #8b949e;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.r { background: #ff5f56; } .dot.y { background: #ffbd2e; } .dot.g { background: #27c93f; }
+  .panel-header .title { margin-left: 8px; color: #c9d1d9; font-weight: 500; }
+
+  /* ===== 流程图 ===== */
+  .flow-panel { padding: 10px; flex: 1; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: -apple-system, "SF Mono", Monaco, monospace; }
+
+  .node-box rect, .node-diamond polygon, .node-oval rect {
+    fill: #161b22; stroke: #30363d; stroke-width: 2;
+    transition: all 0.5s ease;
+  }
+  .node-box text, .node-diamond text, .node-oval text {
+    fill: #8b949e; font-size: 13px;
+    text-anchor: middle; dominant-baseline: central;
+    transition: fill 0.5s ease;
+  }
+  .node-box .icon, .node-diamond .icon, .node-oval .icon { font-size: 18px; text-anchor: middle; }
+
+  .node-box.active rect, .node-diamond.active polygon, .node-oval.active rect {
+    fill: #0c2d4d; stroke: #58a6ff; stroke-width: 2.5;
+    filter: drop-shadow(0 0 12px rgba(88,166,255,0.4));
+  }
+  .node-box.active text, .node-diamond.active text, .node-oval.active text { fill: #f0f6fc; }
+
+  .node-box.done rect, .node-diamond.done polygon, .node-oval.done rect {
+    fill: #0f3d21; stroke: #3fb950; stroke-width: 2.5;
+  }
+  .node-box.done text, .node-diamond.done text, .node-oval.done text { fill: #7ee787; }
+
+  .edge { fill: none; stroke: #30363d; stroke-width: 2; transition: all 0.5s ease; }
+  .edge.active { stroke: #58a6ff; stroke-width: 2.5; filter: drop-shadow(0 0 6px rgba(88,166,255,0.3)); }
+  .edge.done { stroke: #3fb950; }
+  .edge-loop { fill: none; stroke: #30363d; stroke-width: 2; stroke-dasharray: 8 4; transition: all 0.5s ease; }
+  .edge-loop.active { stroke: #f0883e; stroke-width: 2.5; stroke-dasharray: none; filter: drop-shadow(0 0 8px rgba(240,136,62,0.4)); }
+  .edge-label { fill: #8b949e; font-size: 11px; text-anchor: middle; transition: fill 0.5s ease; }
+  .edge-label.active { fill: #58a6ff; font-weight: 600; }
+  .edge-label-yes { fill: #3fb950; font-size: 12px; font-weight: 700; }
+  .edge-label-no { fill: #ff7b72; font-size: 12px; font-weight: 700; }
+
+  .status-bar {
+    margin: 0 10px 10px;
+    padding: 10px 14px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-size: 13px;
+    min-height: 42px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .spinner {
+    width: 13px; height: 13px;
+    border: 2px solid #30363d; border-top-color: #58a6ff;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== Tabs ===== */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #30363d;
+    background: #0d1117;
+  }
+  .tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    color: #8b949e;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { color: #c9d1d9; }
+  .tab.active {
+    color: #f0f6fc;
+    border-bottom-color: #58a6ff;
+  }
+  .tab-icon { font-size: 14px; }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ===== 代码展示 ===== */
+  .code-view {
+    padding: 16px; flex: 1; overflow-y: auto;
+    scroll-behavior: smooth;
+  }
+  .code-view::-webkit-scrollbar { width: 8px; }
+  .code-view::-webkit-scrollbar-track { background: #0d1117; }
+  .code-view::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+
+  .code-block {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .code-block-head {
+    padding: 6px 12px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    font-size: 11px;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .code-block-head .label { font-weight: 600; color: #c9d1d9; }
+  .code-block-head .badge {
+    padding: 1px 8px; border-radius: 4px;
+    font-size: 10px; color: white; font-weight: 600;
+  }
+  pre.code {
+    margin: 0;
+    padding: 14px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #c9d1d9;
+    overflow: auto;
+    white-space: pre;
+  }
+  /* 语法高亮 */
+  .k { color: #ff7b72; }      /* keyword */
+  .s { color: #a5d6ff; }      /* string */
+  .c { color: #8b949e; font-style: italic; }  /* comment */
+  .p { color: #d2a8ff; }      /* property / frontmatter key */
+  .n { color: #79c0ff; }      /* number */
+  .h { color: #7ee787; }      /* highlight (new) */
+  .dim { color: #484f58; }    /* dimmed */
+  .add-line {
+    background: rgba(63,185,80,0.1);
+    display: inline-block; width: calc(100% + 28px);
+    margin: 0 -14px; padding: 0 14px;
+    border-left: 2px solid #3fb950;
+  }
+  .new-section {
+    background: rgba(88,166,255,0.08);
+    display: inline-block; width: calc(100% + 28px);
+    margin: 0 -14px; padding: 0 14px;
+    border-left: 2px solid #58a6ff;
+  }
+
+  /* ===== 对比卡 ===== */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .compare-card {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .compare-card .card-head {
+    padding: 6px 12px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .compare-card .card-body {
+    padding: 10px 12px;
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+  .compare-card .card-body table { width: 100%; border-collapse: collapse; }
+  .compare-card .card-body td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #21262d;
+    vertical-align: top;
+  }
+  .compare-card .card-body td:first-child { color: #8b949e; width: 60px; }
+  .compare-card .card-body code { background: #21262d; padding: 1px 4px; border-radius: 3px; color: #f0f6fc; font-size: 10.5px; }
+
+  .code-empty {
+    color: #484f58;
+    text-align: center;
+    padding: 40px;
+    font-size: 13px;
+  }
+
+  /* ===== 控制 ===== */
+  .controls {
+    max-width: 1400px; margin: 16px auto 0;
+    display: flex; gap: 10px; justify-content: center;
+  }
+  button {
+    background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+    padding: 8px 18px; border-radius: 6px;
+    font-family: inherit; font-size: 13px; cursor: pointer; transition: all .2s;
+  }
+  button:hover:not(:disabled) { background: #30363d; border-color: #58a6ff; color: #f0f6fc; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .turn-counter { text-align: center; color: #8b949e; font-size: 12px; margin-top: 10px; }
+  .turn-counter .num { color: #58a6ff; font-weight: 700; font-size: 16px; }
+
+  .kbd { display:inline-block; background:#21262d; border:1px solid #30363d; border-radius:3px; padding:0 5px; font-size:11px; color:#8b949e; }
+</style>
+</head>
+<body>
+
+<h1>🧩 Skill 组装与解析 · 流程图</h1>
+<div class="subtitle">
+  演示：<code style="background:#21262d;padding:1px 5px;border-radius:3px;color:#f0f6fc;font-size:12px;">/code-review</code> 这类 Skill 在 Claude Code 里如何从文件变成 LLM 看到的 prompt
+  &nbsp;·&nbsp; 快捷键 <span class="kbd">→</span> 下一步 <span class="kbd">←</span> 上一步 <span class="kbd">P</span> 播放 <span class="kbd">R</span> 重置
+</div>
+
+<div class="layout">
+  <!-- 左：流程图 -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">Skill 流程图</span>
+    </div>
+    <div class="flow-panel">
+      <svg viewBox="0 0 440 720" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#30363d"/>
+          </marker>
+          <marker id="ah-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#58a6ff"/>
+          </marker>
+          <marker id="ah-loop" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#f0883e"/>
+          </marker>
+          <marker id="ah-done" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#3fb950"/>
+          </marker>
+        </defs>
+
+        <!-- 节点 -->
+        <g id="n-user" class="node-oval">
+          <rect x="130" y="10" width="180" height="44" rx="22"/>
+          <text x="158" y="32" style="font-size:16px">👤</text>
+          <text x="244" y="32" style="font-size:12px">用户 /code-review</text>
+        </g>
+        <g id="n-skill" class="node-box">
+          <rect x="130" y="85" width="180" height="50" rx="6"/>
+          <text x="160" y="110" style="font-size:18px">📄</text>
+          <text x="240" y="105" style="font-size:13px;font-weight:600">Skill 源文件</text>
+          <text x="240" y="123" style="font-size:10.5px;fill:#484f58">.claude/skills/xxx.md</text>
+        </g>
+        <g id="n-trigger" class="node-diamond">
+          <polygon points="220,165 330,205 220,245 110,205"/>
+          <text x="220" y="200" style="font-size:11px;font-weight:600;fill:#8b949e">触发？</text>
+          <text x="220" y="216" style="font-size:10px;fill:#484f58">/name 或关键字</text>
+        </g>
+        <g id="n-parse" class="node-box">
+          <rect x="130" y="280" width="180" height="50" rx="6"/>
+          <text x="160" y="305" style="font-size:18px">📖</text>
+          <text x="240" y="300" style="font-size:13px;font-weight:600">Harness 解析</text>
+          <text x="240" y="318" style="font-size:10.5px;fill:#484f58">拆 frontmatter + body</text>
+        </g>
+        <g id="n-inject" class="node-box">
+          <rect x="130" y="365" width="180" height="50" rx="6"/>
+          <text x="160" y="390" style="font-size:18px">💉</text>
+          <text x="240" y="385" style="font-size:13px;font-weight:600">Prompt 注入</text>
+          <text x="240" y="403" style="font-size:10.5px;fill:#484f58">body → messages[0]</text>
+        </g>
+        <g id="n-llm" class="node-box">
+          <rect x="130" y="450" width="180" height="50" rx="6"/>
+          <text x="160" y="475" style="font-size:18px">🧠</text>
+          <text x="240" y="470" style="font-size:14px;font-weight:600">LLM 执行</text>
+          <text x="240" y="488" style="font-size:10.5px;fill:#484f58">按注入的指令行事</text>
+        </g>
+        <g id="n-tool" class="node-diamond">
+          <polygon points="220,535 330,575 220,615 110,575"/>
+          <text x="220" y="570" style="font-size:11px;font-weight:600;fill:#8b949e">调 tool？</text>
+          <text x="220" y="586" style="font-size:10px;fill:#484f58">Bash/read_file…</text>
+        </g>
+        <g id="n-end" class="node-oval">
+          <rect x="130" y="655" width="180" height="44" rx="22"/>
+          <text x="158" y="677" style="font-size:16px">✅</text>
+          <text x="244" y="677" style="font-size:13px">输出完成</text>
+        </g>
+
+        <!-- 边 -->
+        <path id="e1" class="edge" d="M220,54 L220,85" marker-end="url(#ah)"/>
+        <path id="e2" class="edge" d="M220,135 L220,165" marker-end="url(#ah)"/>
+        <path id="e3" class="edge" d="M220,245 L220,280" marker-end="url(#ah)"/>
+        <text id="el-e3" class="edge-label-yes" x="236" y="266">YES</text>
+        <path id="e4" class="edge" d="M220,330 L220,365" marker-end="url(#ah)"/>
+        <path id="e5" class="edge" d="M220,415 L220,450" marker-end="url(#ah)"/>
+        <path id="e6" class="edge" d="M220,500 L220,535" marker-end="url(#ah)"/>
+        <path id="e7" class="edge" d="M330,575 L395,575 L395,677 L310,677" marker-end="url(#ah)"/>
+        <text id="el-e7" class="edge-label-no" x="362" y="568">NO</text>
+        <path id="e-loop" class="edge-loop" d="M110,575 L50,575 L50,475 L130,475" marker-end="url(#ah-loop)"/>
+        <text id="el-loop" x="38" y="525" style="fill:#30363d;font-size:11px;font-weight:700;text-anchor:middle;writing-mode:vertical-lb;transition:fill .5s">↻ 回到 LLM</text>
+      </svg>
+    </div>
+    <div class="status-bar" id="status">
+      <span style="color:#8b949e">⏸  等待启动…</span>
+    </div>
+    <div class="turn-counter">
+      步骤：<span class="num" id="step-num">-</span> / <span id="step-total">7</span>
+    </div>
+  </div>
+
+  <!-- 右：Tabs -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">详情面板</span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="skill">
+        <span class="tab-icon">📄</span> Skill & Prompt
+      </div>
+      <div class="tab" data-tab="api">
+        <span class="tab-icon">📡</span> API 请求
+      </div>
+    </div>
+
+    <div class="tab-content active" data-tab-content="skill">
+      <div class="code-view" id="skill-view">
+        <div class="code-empty">
+          👆 点击「下一步」开始演示<br>
+          这里会实时显示 Skill 源文件、解析产物、LLM 视角
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" data-tab-content="api">
+      <div class="code-view" id="api-view">
+        <div class="code-empty">
+          👆 点击「下一步」开始演示<br>
+          这里会实时显示发给 Claude API 的请求 / 响应
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn-prev">◀ 上一步</button>
+  <button id="btn-next">下一步 ▶</button>
+  <button id="btn-play">▶▶ 自动播放</button>
+  <button id="btn-reset">↺ 重置</button>
+</div>
+
+<script>
+// ====== DOM ======
+const skillView = document.getElementById('skill-view');
+const apiView = document.getElementById('api-view');
+const status = document.getElementById('status');
+const stepNum = document.getElementById('step-num');
+
+// ====== Tab 切换 ======
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+// ====== 流程节点/边 ======
+const allNodes = ['n-user','n-skill','n-trigger','n-parse','n-inject','n-llm','n-tool','n-end'];
+const allEdges = ['e1','e2','e3','e4','e5','e6','e7','e-loop'];
+
+function clearHL() {
+  allNodes.forEach(id => document.getElementById(id).classList.remove('active','done'));
+  allEdges.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    if (id === 'e-loop') {
+      el.setAttribute('marker-end', 'url(#ah-loop)');
+    } else {
+      el.setAttribute('marker-end', 'url(#ah)');
+    }
+  });
+  ['el-e3','el-e7','el-loop'].forEach(id =>
+    document.getElementById(id).classList.remove('active'));
+}
+function setNodes(mode, ids) { ids.forEach(id => document.getElementById(id).classList.add(mode)); }
+function setEdges(mode, ids, loopEdges) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.add(mode);
+    if (id === 'e-loop') return;
+    el.setAttribute('marker-end', mode === 'active' ? 'url(#ah-active)' :
+                                   mode === 'done' ? 'url(#ah-done)' : 'url(#ah)');
+  });
+  (loopEdges || []).forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.add('active');
+    el.setAttribute('marker-end','url(#ah-loop)');
+  });
+}
+function setLabels(ids) { ids.forEach(id => document.getElementById(id).classList.add('active')); }
+function setStatus(html) { status.innerHTML = html; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setSkillView(html) { skillView.innerHTML = html; }
+function setApiView(html) { apiView.innerHTML = html; }
+
+// ====== 剧本 ======
+const script = [
+  // 0. 展示 skill 源文件
+  {
+    apply() {
+      stepNum.textContent = '1';
+      clearHL();
+      setNodes('active', ['n-user','n-skill']);
+      setEdges('active', ['e1']);
+      setStatus('<span style="color:#79c0ff">●</span> ① Skill 源文件：一个 Markdown + YAML frontmatter 的 .md 文件');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">📄 .claude/skills/code-review.md</span>
+            <span class="badge" style="background:#1f6feb">skill 源文件</span>
+          </div>
+          <pre class="code"><span class="c">---</span>
+<span class="p">name</span>: <span class="s">code-review</span>
+<span class="p">description</span>: <span class="s">Review the current diff for correctness bugs</span>
+<span class="p">when_to_use</span>: <span class="s">|</span>
+  <span class="s">- User asks for a code review</span>
+  <span class="s">- User says "/code-review"</span>
+  <span class="s">- User mentions "review my PR"</span>
+<span class="p">effort</span>: <span class="s">high</span>
+<span class="c">---</span>
+
+<span class="h"># Code Review Skill</span>
+
+<span class="h">You are a senior engineer doing a code review.</span>
+
+<span class="h">## Instructions</span>
+<span class="h">1. Run \`git diff\` to see the changes</span>
+<span class="h">2. Look for: correctness bugs, race conditions,</span>
+<span class="h">   security issues, off-by-one errors</span>
+<span class="h">3. For each finding, cite file:line</span>
+<span class="h">4. Output as a markdown table:</span>
+<span class="h">   | File | Line | Severity | Issue |</span>
+
+<span class="c">## Severity levels</span>
+<span class="c">- **CRITICAL**: data loss, security hole</span>
+<span class="c">- **HIGH**: correctness bug</span>
+<span class="c">- **MEDIUM**: performance, readability</span>
+<span class="c">- **LOW**: style nit</span>
+...
+</pre>
+        </div>
+        <div style="color:#8b949e;font-size:12px;padding:4px 0;">
+          💡 Skill 文件躺在磁盘上，harness 还没触发它。此时没有任何 API 请求。
+        </div>
+      `);
+
+      setApiView(`
+        <div class="code-empty">
+          ⏸ Skill 还未触发，没有 API 请求
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '1';
+      clearHL();
+      setNodes('active', ['n-user','n-skill']);
+      setEdges('active', ['e1']);
+      setStatus('<div class="spinner"></div> 读取 .claude/skills/code-review.md …');
+      await sleep(900);
+      this.apply();
+    }
+  },
+
+  // 1. 触发检测
+  {
+    apply() {
+      stepNum.textContent = '2';
+      clearHL();
+      setNodes('done', ['n-user','n-skill']);
+      setNodes('active', ['n-trigger']);
+      setEdges('done', ['e1','e2']);
+      setStatus('<span style="color:#79c0ff">●</span> ② 触发检测：用户在 prompt 里输入 <code>/code-review</code> 或提到 "review this PR"');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">💬 用户输入（CLI 里）</span>
+            <span class="badge" style="background:#d2a8ff">触发 skill</span>
+          </div>
+          <pre class="code"><span class="c">// 用户输入</span>
+<span class="h">/code-review src/auth.py</span>
+
+<span class="c">// harness 正则匹配到 "/code-review" 或</span>
+<span class="c">// LLM 看到 "review" 关键字 → 决定调用 Skill 工具</span>
+</pre>
+        </div>
+        <div style="color:#8b949e;font-size:12px;padding:4px 0;">
+          🔍 Harness 通过 <code>when_to_use</code> 或 <code>/name</code> 触发规则匹配到这个 skill。
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '2';
+      clearHL();
+      setNodes('done', ['n-user','n-skill']);
+      setNodes('active', ['n-trigger']);
+      setEdges('done', ['e1','e2']);
+      setStatus('<div class="spinner"></div> 检测触发条件…');
+      await sleep(900);
+      this.apply();
+    }
+  },
+
+  // 2. Harness 解析
+  {
+    apply() {
+      stepNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger']);
+      setNodes('active', ['n-parse']);
+      setEdges('done', ['e1','e2','e3']);
+      setLabels(['el-e3']);
+      setStatus('<span style="color:#79c0ff">●</span> ③ Harness 解析：拆 frontmatter 和 markdown body');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">📄 解析后结构</span>
+            <span class="badge" style="background:#f0883e">parsed</span>
+          </div>
+          <pre class="code"><span class="p">Frontmatter (元数据)</span>
+  <span class="s">name</span>:          <span class="s">"code-review"</span>       <span class="c">← 调用标识</span>
+  <span class="s">description</span>:  <span class="s">"Review the current..."</span> <span class="c">← 给 LLM 看</span>
+  <span class="s">when_to_use</span>:  <span class="s">"- User asks for..."</span>    <span class="c">← harness 触发规则</span>
+  <span class="s">effort</span>:       <span class="s">"high"</span>                <span class="c">← 控制 LLM 深度</span>
+
+<span class="p">Body (指令正文)</span>
+  <span class="s">"# Code Review Skill\\n\\nYou are a senior..."</span>
+  <span class="c">← 这部分会注入到 system prompt</span>
+</pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">📋 Harness 内存中的 skill 对象</span>
+            <span class="badge" style="background:#f0883e">memory object</span>
+          </div>
+          <pre class="code"><span class="c">// harness 内存中的 skill 对象</span>
+<span class="k">const</span> skill = {
+  <span class="p">name</span>: <span class="s">"code-review"</span>,
+  <span class="p">description</span>: <span class="s">"Review the current diff..."</span>,
+  <span class="p">whenToUse</span>: [<span class="s">"User asks for a code review"</span>, ...],
+  <span class="p">effort</span>: <span class="s">"high"</span>,
+  <span class="p">body</span>: <span class="s">\`
+    # Code Review Skill
+
+    You are a senior engineer doing a code review.
+
+    ## Instructions
+    1. Run \\\`git diff\\\` to see the changes
+    2. Look for: correctness bugs, race conditions,
+       security issues, off-by-one errors
+    ...
+  \`</span>
+};
+</pre>
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger']);
+      setNodes('active', ['n-parse']);
+      setEdges('done', ['e1','e2','e3']);
+      setLabels(['el-e3']);
+      setStatus('<div class="spinner"></div> 解析 YAML frontmatter + markdown …');
+      await sleep(900);
+      this.apply();
+    }
+  },
+
+  // 3. Prompt 注入 —— 核心步骤
+  {
+    apply() {
+      stepNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse']);
+      setNodes('active', ['n-inject']);
+      setEdges('done', ['e1','e2','e3','e4']);
+      setStatus('<span style="color:#3fb950">●</span> ④ <b>Prompt 注入</b>：skill body 被塞进 system-reminder，LLM 看到的 prompt 变长了');
+
+      setApiView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">📡 组装后的 messages[]</span>
+            <span class="badge" style="background:#3fb950">关键变化</span>
+          </div>
+          <pre class="code"><span class="c">// 注意：skill 不在 tools[] 里，而是注入到 prompt</span>
+{
+  <span class="p">model</span>: <span class="s">"claude-opus-5"</span>,
+  <span class="p">max_tokens</span>: <span class="n">8192</span>,
+  <span class="p">system</span>: <span class="s">"You are Claude Code, Anthropic's CLI..."</span>,
+
+  <span class="p">messages</span>: [
+<span class="add-line">    <span class="c">// 🧩 注入的 skill 指令（作为 system-reminder）</span></span>
+<span class="add-line">    {</span>
+<span class="add-line">      <span class="p">role</span>: <span class="s">"user"</span>,</span>
+<span class="add-line">      <span class="p">content</span>: <span class="s">"&lt;system-reminder&gt;\\n"</span></span>
+<span class="add-line">        + <span class="s">"The following skill has been loaded.\\n"</span></span>
+<span class="add-line">        + <span class="s">"Follow its instructions precisely.\\n\\n"</span></span>
+<span class="add-line">        + <span class="s">"&lt;/skill&gt;"</span></span>
+<span class="add-line">        + <span class="s">"# Code Review Skill\\n\\n"</span></span>
+<span class="add-line">        + <span class="s">"You are a senior engineer...\\n"</span></span>
+<span class="add-line">        + <span class="s">"## Instructions\\n"</span></span>
+<span class="add-line">        + <span class="s">"1. Run \\\`git diff\\\`...\\n"</span></span>
+<span class="add-line">        + <span class="s">"..."</span></span>
+<span class="add-line">        + <span class="s">"&lt;/system-reminder&gt;"</span></span>
+<span class="add-line">    },</span>
+
+    <span class="c">// 实际用户请求</span>
+    {
+      <span class="p">role</span>: <span class="s">"user"</span>,
+      <span class="p">content</span>: <span class="s">"/code-review src/auth.py"</span>
+    }
+  ],
+
+  <span class="c">// 🔧 tools 里 <b>没有</b> code-review —— skill 不是 tool</span>
+  <span class="p">tools</span>: [
+    { <span class="p">name</span>: <span class="s">"read_file"</span>, ... },
+    { <span class="p">name</span>: <span class="s">"edit_file"</span>, ... },
+    { <span class="p">name</span>: <span class="s">"Bash"</span>, ... }
+    <span class="dim">// 注意：没有 "code-review"</span>
+  ]
+}
+</pre>
+        </div>
+      `);
+
+      setSkillView(`
+        <div style="color:#8b949e;font-size:12px;padding:8px 0;">
+          👉 切换到「📡 API 请求」tab 查看注入细节
+        </div>
+        <div class="compare">
+          <div class="compare-card">
+            <div class="card-head" style="color:#79c0ff">🔧 Tool（工具）</div>
+            <div class="card-body">
+              <table>
+                <tr><td>本质</td><td><b>LLM 可调用的函数</b></td></tr>
+                <tr><td>位置</td><td>API 的 <code>tools[]</code></td></tr>
+                <tr><td>触发</td><td>LLM 返回 <code>tool_use</code></td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="compare-card">
+            <div class="card-head" style="color:#d2a8ff">🧩 Skill（技能）</div>
+            <div class="card-body">
+              <table>
+                <tr><td>本质</td><td><b>预制的大段 prompt</b></td></tr>
+                <tr><td>位置</td><td><code>messages[0].content</code> 注入</td></tr>
+                <tr><td>触发</td><td>Harness 直接塞进 prompt</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse']);
+      setNodes('active', ['n-inject']);
+      setEdges('done', ['e1','e2','e3','e4']);
+      setStatus('<div class="spinner"></div> 组装请求：把 skill body 注入到 messages[0] …');
+      await sleep(1000);
+      this.apply();
+    }
+  },
+
+  // 4. LLM 看到的内容
+  {
+    apply() {
+      stepNum.textContent = '5';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject']);
+      setNodes('active', ['n-llm','n-tool']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6']);
+      setStatus('<span style="color:#d2a8ff">●</span> ⑤ LLM 视角：它不知道 "skill" 这个概念，只看到一长段指令 + 一个要 review 的请求');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">🧠 LLM 看到的完整 prompt</span>
+            <span class="badge" style="background:#d2a8ff">llm view</span>
+          </div>
+          <pre class="code"><span class="c">┌─────────────────────────────────────┐</span>
+<span class="c">│  system: "You are Claude Code..."    │</span>
+<span class="c">└─────────────────────────────────────┘</span>
+<span class="c">          ↓</span>
+<span class="new-section"><span class="c">┌─────────────────────────────────────┐</span></span>
+<span class="new-section"><span class="c">│  🧩 &lt;system-reminder&gt;                │</span></span>
+<span class="new-section"><span class="c">│  "Follow this skill:                 │</span></span>
+<span class="new-section"><span class="c">│   # Code Review Skill                │</span></span>
+<span class="new-section"><span class="c">│   You are a senior engineer...       │</span></span>
+<span class="new-section"><span class="c">│   1. Run git diff...                 │</span></span>
+<span class="new-section"><span class="c">│   2. Look for bugs...                │</span></span>
+<span class="new-section"><span class="c">│   3. Output as table..."             │</span></span>
+<span class="new-section"><span class="c">│  &lt;/system-reminder&gt;                  │</span></span>
+<span class="new-section"><span class="c">└─────────────────────────────────────┘</span></span>
+<span class="c">          ↓</span>
+<span class="c">┌─────────────────────────────────────┐</span>
+<span class="c">│  user: "/code-review src/auth.py"    │</span>
+<span class="c">└─────────────────────────────────────┘</span>
+
+<span class="c">LLM 内心：</span>
+<span class="s">"哦，我收到了一段指令让我做 code review，</span>
+<span class="s"> 用户要我 review src/auth.py，</span>
+<span class="s"> 我应该按指令先调 Bash 跑 git diff..."</span>
+</pre>
+        </div>
+      `);
+
+      setApiView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">🔧 LLM 的响应（第一步）</span>
+            <span class="badge" style="background:#d2a8ff">LLM 决定调 tool</span>
+          </div>
+          <pre class="code"><span class="c">// LLM 按照注入的 skill 指令开始工作</span>
+<span class="c">// 第一步：调 Bash 工具跑 git diff</span>
+
+{
+  <span class="p">role</span>: <span class="s">"assistant"</span>,
+  <span class="p">content</span>: [
+    {
+      <span class="p">type</span>: <span class="s">"text"</span>,
+      <span class="p">text</span>: <span class="s">"I'll review the changes."</span>
+    },
+    {
+      <span class="p">type</span>: <span class="s">"tool_use"</span>,
+      <span class="p">id</span>: <span class="s">"toolu_01A2B3"</span>,
+      <span class="p">name</span>: <span class="s">"Bash"</span>,            <span class="c">← 真的是 tool</span>
+      <span class="p">input</span>: {
+        <span class="p">command</span>: <span class="s">"git diff HEAD src/auth.py"</span>
+      }
+    }
+  ],
+  <span class="p">stop_reason</span>: <span class="s">"tool_use"</span>
+}
+</pre>
+        </div>
+        <div style="color:#8b949e;font-size:12px;padding:4px 0;">
+          🔁 LLM 调用 tool 后，结果会回到 LLM 继续工作 —— 这就是流程图里的循环。
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '5';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject']);
+      setNodes('active', ['n-llm','n-tool']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6']);
+      setStatus('<div class="spinner"></div> LLM 看到 prompt 后开始工作…');
+      await sleep(900);
+      this.apply();
+    }
+  },
+
+  // 5. 完整对比（before vs after）
+  {
+    apply() {
+      stepNum.textContent = '6';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject','n-llm','n-tool','n-end']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6','e7']);
+      setLabels(['el-e7']);
+      setStatus('<span style="color:#3fb950">✓</span> 完整对比：skill 触发前 vs 触发后，API 请求的差异');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">❌ 没有 skill 时的请求</span>
+            <span class="badge" style="background:#ff7b72">before</span>
+          </div>
+          <pre class="code">{
+  <span class="p">model</span>: <span class="s">"claude-opus-5"</span>,
+  <span class="p">system</span>: <span class="s">"You are Claude Code..."</span>,
+  <span class="p">messages</span>: [
+    { <span class="p">role</span>: <span class="s">"user"</span>,
+      <span class="p">content</span>: <span class="s">"帮我 review src/auth.py"</span> }
+  ],
+  <span class="p">tools</span>: [{ <span class="p">name</span>: <span class="s">"Bash"</span> }, { <span class="p">name</span>: <span class="s">"read_file"</span> }, ...]
+}
+
+<span class="c">// LLM 看到："哦，用户让我 review 代码，</span>
+<span class="c">//   但我没有具体指令，</span>
+<span class="c">//   我就随便看看、随便说说吧"</span>
+<span class="c">//</span>
+<span class="c">// 结果：泛泛而谈，没有结构化输出</span>
+</pre>
+        </div>
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">✅ 有 skill 后的请求</span>
+            <span class="badge" style="background:#3fb950">after</span>
+          </div>
+          <pre class="code">{
+  <span class="p">model</span>: <span class="s">"claude-opus-5"</span>,
+  <span class="p">system</span>: <span class="s">"You are Claude Code..."</span>,
+  <span class="p">messages</span>: [
+<span class="add-line">    { <span class="p">role</span>: <span class="s">"user"</span>,</span>
+<span class="add-line">      <span class="p">content</span>: <span class="s">"&lt;system-reminder&gt;\\n"</span></span>
+<span class="add-line">        + <span class="s">"# Code Review Skill\\n"</span></span>
+<span class="add-line">        + <span class="s">"You are a senior engineer...\\n"</span></span>
+<span class="add-line">        + <span class="s">"## Instructions\\n"</span></span>
+<span class="add-line">        + <span class="s">"1. Run git diff...\\n"</span></span>
+<span class="add-line">        + <span class="s">"2. Look for bugs...\\n"</span></span>
+<span class="add-line">        + <span class="s">"3. Output as table..."</span></span>
+<span class="add-line">        + <span class="s">"&lt;/system-reminder&gt;"</span> },</span>
+    { <span class="p">role</span>: <span class="s">"user"</span>,
+      <span class="p">content</span>: <span class="s">"帮我 review src/auth.py"</span> }
+  ],
+  <span class="p">tools</span>: [{ <span class="p">name</span>: <span class="s">"Bash"</span> }, { <span class="p">name</span>: <span class="s">"read_file"</span> }, ...]
+  <span class="c">// ↑ 注意：tools 完全没变！</span>
+}
+
+<span class="h">// LLM 看到："哦，我有份详细的工作指引，</span>
+<span class="h">//   要跑 git diff、找 bug、输出表格"</span>
+<span class="h">//</span>
+<span class="h">// 结果：结构化、深度、可预期</span>
+</pre>
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '6';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject','n-llm','n-tool','n-end']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6','e7']);
+      setLabels(['el-e7']);
+      setStatus('<div class="spinner"></div> 对比 before/after …');
+      await sleep(900);
+      this.apply();
+    }
+  },
+
+  // 6. 总结
+  {
+    apply() {
+      stepNum.textContent = '7';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject','n-llm','n-tool','n-end']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6','e7']);
+      setStatus('<span style="color:#3fb950">✓</span> 一句话总结：<b>Skill = Prompt 注入</b>，不是 tool，不进 <code>tools[]</code>');
+
+      setSkillView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">🎯 关键洞察</span>
+            <span class="badge" style="background:#58a6ff">核心</span>
+          </div>
+          <pre class="code"><span class="k">Skill ≠ Tool</span>
+
+<span class="c">Tool 在 API 里的位置：</span>
+  request.<span class="p">tools</span>[]
+  → LLM 看到 → 决定调 → 返回 tool_use
+  → harness 执行 → 把结果塞回 messages
+
+<span class="h">Skill 在 API 里的位置：</span>
+  request.<span class="p">messages</span>[0].content  （作为 system-reminder 注入）
+  <span class="c">或</span>
+  request.<span class="p">system</span>               （拼到 system prompt 末尾）
+
+  → LLM 看到后，按指令行事
+  → 可能会调 tools（Bash/read_file 等）
+  → skill 本身没有"执行"过程，它就是段文本
+
+
+<span class="k">所以：</span>
+  - Skill 的 name/description <span class="h">不进</span> 请求体
+  - 只有 skill 的 body（指令正文）被注入到 prompt
+  - name/description 只用来让 harness 做匹配和展示
+</pre>
+        </div>
+      `);
+
+      setApiView(`
+        <div class="code-block">
+          <div class="code-block-head">
+            <span class="label">🔄 完整调用链路</span>
+            <span class="badge" style="background:#58a6ff">full flow</span>
+          </div>
+          <pre class="code"><span class="p">用户输入</span>: <span class="s">"/code-review src/auth.py"</span>
+    │
+    ↓
+<span class="p">Harness</span>: 正则匹配 /code-review
+    │
+    ↓ 读取
+<span class="p">磁盘</span>: .claude/skills/code-review.md
+    │
+    ↓ 解析 YAML frontmatter
+<span class="p">内存</span>: { name, description, body: "..." }
+    │
+    ↓ 把 body 塞进 messages[0]
+<span class="p">请求体</span>: POST /v1/messages {
+          messages: [
+            { role: "user",
+              content: "&lt;system-reminder&gt;"
+                     + body
+                     + "&lt;/system-reminder&gt;" },
+            { role: "user", content: "/code-review..." }
+          ]
+        }
+    │
+    ↓
+<span class="p">Claude API</span>: 处理请求，按指令行事
+    │
+    ↓ 响应
+<span class="p">LLM 输出</span>: tool_use(Bash, "git diff src/auth.py")
+    │
+    ↓ harness 执行
+<span class="p">真实世界</span>: git 命令跑完，stdout 拿回来
+    │
+    ↓ 继续循环
+<span class="p">LLM</span>: 分析 diff，输出 markdown 表格
+    │
+    ↓
+<span class="h">✅ 用户看到一份结构化的 code review</span>
+</pre>
+        </div>
+      `);
+    },
+    async animate() {
+      stepNum.textContent = '7';
+      clearHL();
+      setNodes('done', ['n-user','n-skill','n-trigger','n-parse','n-inject','n-llm','n-tool','n-end']);
+      setEdges('done', ['e1','e2','e3','e4','e5','e6','e7']);
+      setStatus('<div class="spinner"></div> 总结 …');
+      await sleep(700);
+      this.apply();
+    }
+  }
+];
+
+// ====== 控制 ======
+let currentStep = -1;
+let playing = false;
+let cancelled = false;
+
+function hardReset() {
+  clearHL();
+  setStatus('<span style="color:#8b949e">⏸  等待启动…</span>');
+  stepNum.textContent = '-';
+  setSkillView('<div class="code-empty">👆 点击「下一步」开始演示<br>这里会实时显示 Skill 源文件、解析产物、LLM 视角</div>');
+  setApiView('<div class="code-empty">👆 点击「下一步」开始演示<br>这里会实时显示发给 Claude API 的请求 / 响应</div>');
+  currentStep = -1;
+}
+
+function replayTo(n) {
+  hardReset();
+  for (let i = 0; i <= n; i++) script[i].apply();
+  currentStep = n;
+  updateButtons();
+}
+
+function nextStep() {
+  if (currentStep >= script.length - 1) return;
+  stopPlay();
+  currentStep++;
+  script[currentStep].apply();
+  updateButtons();
+}
+
+function prevStep() {
+  stopPlay();
+  if (currentStep <= 0) { hardReset(); updateButtons(); return; }
+  replayTo(currentStep - 1);
+}
+
+function updateButtons() {
+  document.getElementById('btn-prev').disabled = currentStep < 0;
+  document.getElementById('btn-next').disabled = currentStep >= script.length - 1;
+}
+
+async function play() {
+  if (playing) return;
+  playing = true; cancelled = false;
+  document.getElementById('btn-play').textContent = '⏸ 暂停';
+  const startFrom = currentStep + 1;
+  for (let i = startFrom; i < script.length; i++) {
+    if (cancelled) break;
+    currentStep = i;
+    updateButtons();
+    await script[i].animate();
+    if (cancelled) break;
+    if (i < script.length - 1) await sleep(800);
+  }
+  playing = false; cancelled = false;
+  document.getElementById('btn-play').textContent = '▶▶ 自动播放';
+  updateButtons();
+}
+
+function stopPlay() {
+  if (playing) {
+    cancelled = true; playing = false;
+    document.getElementById('btn-play').textContent = '▶▶ 自动播放';
+  }
+}
+
+function reset() { stopPlay(); hardReset(); updateButtons(); }
+
+document.getElementById('btn-prev').onclick = prevStep;
+document.getElementById('btn-next').onclick = nextStep;
+document.getElementById('btn-play').onclick = () => {
+  if (playing) { stopPlay(); updateButtons(); } else play();
+};
+document.getElementById('btn-reset').onclick = reset;
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+  else if (e.key === 'r' || e.key === 'R') reset();
+  else if (e.key === 'p' || e.key === 'P') {
+    if (playing) { stopPlay(); updateButtons(); } else play();
+  }
+});
+
+updateButtons();
+</script>
+
+</body>
+</html>

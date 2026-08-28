@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Agent Loop · 流程图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "SF Mono", Monaco, Consolas, monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    min-height: 100vh;
+    padding: 24px;
+    font-size: 14px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; color: #f0f6fc; }
+  .subtitle { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    padding: 10px 16px;
+    border-bottom: 1px solid #30363d;
+    background: #0d1117;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #8b949e;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.r { background: #ff5f56; } .dot.y { background: #ffbd2e; } .dot.g { background: #27c93f; }
+  .panel-header .title { margin-left: 8px; color: #c9d1d9; font-weight: 500; }
+
+  /* ===== 流程图 ===== */
+  .flow-panel { padding: 10px; flex: 1; }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: -apple-system, "SF Mono", Monaco, monospace; }
+
+  .node-box rect, .node-diamond polygon, .node-oval rect {
+    fill: #161b22; stroke: #30363d; stroke-width: 2;
+    transition: all 0.5s ease;
+  }
+  .node-box text, .node-diamond text, .node-oval text {
+    fill: #8b949e; font-size: 13px;
+    text-anchor: middle; dominant-baseline: central;
+    transition: fill 0.5s ease;
+  }
+  .node-box .icon, .node-diamond .icon, .node-oval .icon { font-size: 18px; text-anchor: middle; }
+
+  .node-box.active rect, .node-diamond.active polygon, .node-oval.active rect {
+    fill: #0c2d4d; stroke: #58a6ff; stroke-width: 2.5;
+    filter: drop-shadow(0 0 12px rgba(88,166,255,0.4));
+  }
+  .node-box.active text, .node-diamond.active text, .node-oval.active text { fill: #f0f6fc; }
+
+  .node-box.done rect, .node-diamond.done polygon, .node-oval.done rect {
+    fill: #0f3d21; stroke: #3fb950; stroke-width: 2.5;
+  }
+  .node-box.done text, .node-diamond.done text, .node-oval.done text { fill: #7ee787; }
+
+  .edge { fill: none; stroke: #30363d; stroke-width: 2; transition: all 0.5s ease; }
+  .edge.active { stroke: #58a6ff; stroke-width: 2.5; filter: drop-shadow(0 0 6px rgba(88,166,255,0.3)); }
+  .edge.done { stroke: #3fb950; }
+  .edge-loop { fill: none; stroke: #30363d; stroke-width: 2; stroke-dasharray: 8 4; transition: all 0.5s ease; }
+  .edge-loop.active { stroke: #f0883e; stroke-width: 2.5; stroke-dasharray: none; filter: drop-shadow(0 0 8px rgba(240,136,62,0.4)); }
+  .edge-label { fill: #8b949e; font-size: 11px; text-anchor: middle; transition: fill 0.5s ease; }
+  .edge-label.active { fill: #58a6ff; font-weight: 600; }
+  .edge-label-yes { fill: #3fb950; font-size: 12px; font-weight: 700; }
+  .edge-label-no { fill: #ff7b72; font-size: 12px; font-weight: 700; }
+
+  .status-bar {
+    margin: 0 10px 10px;
+    padding: 10px 14px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    font-size: 13px;
+    min-height: 42px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .spinner {
+    width: 13px; height: 13px;
+    border: 2px solid #30363d; border-top-color: #58a6ff;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== Tabs ===== */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #30363d;
+    background: #0d1117;
+  }
+  .tab {
+    padding: 10px 18px;
+    font-size: 13px;
+    color: #8b949e;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .tab:hover { color: #c9d1d9; }
+  .tab.active {
+    color: #f0f6fc;
+    border-bottom-color: #58a6ff;
+  }
+  .tab-icon { font-size: 14px; }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ===== 对话历史 ===== */
+  .chat { padding: 16px; flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  .msg {
+    margin-bottom: 12px;
+    opacity: 0; transform: translateY(8px);
+    animation: slideIn 0.35s forwards;
+  }
+  @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
+  .msg-head {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
+  }
+  .badge { padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+  .msg.user .msg-head { color: #79c0ff; }
+  .msg.user .badge { background: #0c2d4d; color: #79c0ff; }
+  .msg.assistant .msg-head { color: #d2a8ff; }
+  .msg.assistant .badge { background: #2d1b4e; color: #d2a8ff; }
+  .msg.tool .msg-head { color: #7ee787; }
+  .msg.tool .badge { background: #0f3d21; color: #7ee787; }
+  .msg-body {
+    background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.assistant .msg-body { border-color: #3d2e5c; }
+  .msg.tool .msg-body { border-color: #23402c; font-family: "SF Mono", monospace; font-size: 11.5px; }
+
+  .tool-call {
+    background: #0d1117; border: 1px solid #3d2e5c; border-radius: 6px;
+    padding: 6px 8px; margin: 4px 0; font-size: 11.5px;
+  }
+  .tool-call .fn { color: #d2a8ff; font-weight: 600; }
+  .tool-call .args { color: #8b949e; font-family: "SF Mono", monospace; font-size: 11px; margin-top: 2px; }
+  .tool-call .args .str { color: #a5d6ff; }
+  .tool-call .args .kw { color: #ff7b72; }
+
+  code.inline { background: #21262d; padding: 1px 5px; border-radius: 3px; color: #f0f6fc; font-size: 12px; }
+  .diff-old { color: #ff7b72; } .diff-new { color: #7ee787; }
+
+  /* ===== API 详情 ===== */
+  .api-view { padding: 16px; flex: 1; overflow-y: auto; }
+  .api-section {
+    margin-bottom: 18px;
+  }
+  .api-section-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: #8b949e;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .api-section-head .method {
+    background: #1f6feb;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .api-section-head .url {
+    color: #c9d1d9;
+    font-family: "SF Mono", monospace;
+    font-size: 12px;
+  }
+  .api-section-head .tag {
+    margin-left: auto;
+    font-size: 10px;
+    color: #8b949e;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .api-block {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .api-block-head {
+    padding: 6px 12px;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    font-size: 11px;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .api-block-head .label { font-weight: 600; color: #c9d1d9; }
+  .copy-btn {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .copy-btn.copied { color: #3fb950; border-color: #3fb950; }
+  pre.api-json {
+    margin: 0;
+    padding: 12px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #c9d1d9;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .json-key { color: #79c0ff; }
+  .json-str { color: #a5d6ff; }
+  .json-num { color: #ff7b72; }
+  .json-bool { color: #d2a8ff; }
+  .json-null { color: #8b949e; }
+  .json-highlight {
+    background: rgba(88,166,255,0.1);
+    display: inline-block;
+    width: 100%;
+    margin: 0 -12px;
+    padding: 0 12px;
+    border-left: 2px solid #58a6ff;
+  }
+
+  .api-empty {
+    color: #484f58;
+    text-align: center;
+    padding: 40px;
+    font-size: 13px;
+  }
+
+  /* ===== 控制 ===== */
+  .controls {
+    max-width: 1400px; margin: 16px auto 0;
+    display: flex; gap: 10px; justify-content: center;
+  }
+  button {
+    background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+    padding: 8px 18px; border-radius: 6px;
+    font-family: inherit; font-size: 13px; cursor: pointer; transition: all .2s;
+  }
+  button:hover:not(:disabled) { background: #30363d; border-color: #58a6ff; color: #f0f6fc; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .turn-counter { text-align: center; color: #8b949e; font-size: 12px; margin-top: 10px; }
+  .turn-counter .num { color: #58a6ff; font-weight: 700; font-size: 16px; }
+
+  .chat::-webkit-scrollbar, .api-view::-webkit-scrollbar { width: 8px; }
+  .chat::-webkit-scrollbar-track, .api-view::-webkit-scrollbar-track { background: #0d1117; }
+  .chat::-webkit-scrollbar-thumb, .api-view::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+
+  .kbd { display:inline-block; background:#21262d; border:1px solid #30363d; border-radius:3px; padding:0 5px; font-size:11px; color:#8b949e; }
+</style>
+</head>
+<body>
+
+<h1>🤖 Agent Loop · 流程图</h1>
+<div class="subtitle">任务：给 <code class="inline">calc_tax</code> 函数加上 5000 元免税额度
+&nbsp;·&nbsp; 快捷键 <span class="kbd">→</span> 下一步 <span class="kbd">←</span> 上一步 <span class="kbd">P</span> 播放 <span class="kbd">R</span> 重置</div>
+
+<div class="layout">
+  <!-- 左：流程图 -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">Agent Loop · 流程图</span>
+    </div>
+    <div class="flow-panel">
+      <svg viewBox="0 0 440 560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#30363d"/>
+          </marker>
+          <marker id="ah-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#58a6ff"/>
+          </marker>
+          <marker id="ah-loop" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#f0883e"/>
+          </marker>
+          <marker id="ah-done" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6 Z" fill="#3fb950"/>
+          </marker>
+        </defs>
+
+        <g id="n-start" class="node-oval">
+          <rect x="130" y="10" width="180" height="44" rx="22"/>
+          <text x="220" y="32" style="font-size:16px">👤</text>
+          <text x="244" y="32" style="font-size:13px">用户输入任务</text>
+        </g>
+        <g id="n-llm" class="node-box">
+          <rect x="130" y="90" width="180" height="50" rx="6"/>
+          <text x="160" y="115" style="font-size:18px">🧠</text>
+          <text x="240" y="108" style="font-size:14px;font-weight:600">LLM 推理</text>
+          <text x="240" y="126" style="font-size:11px;fill:#484f58">claude.chat(messages, tools)</text>
+        </g>
+        <g id="n-decide" class="node-diamond">
+          <polygon points="220,175 330,225 220,275 110,225"/>
+          <text x="220" y="218" style="font-size:12px;font-weight:600;fill:#8b949e">有 tool_calls</text>
+          <text x="220" y="236" style="font-size:12px;font-weight:600;fill:#8b949e">吗？</text>
+        </g>
+        <g id="n-tool" class="node-box">
+          <rect x="130" y="310" width="180" height="50" rx="6"/>
+          <text x="160" y="335" style="font-size:18px">🔧</text>
+          <text x="240" y="328" style="font-size:14px;font-weight:600">执行工具</text>
+          <text x="240" y="346" style="font-size:11px;fill:#484f58">read / edit / test / ...</text>
+        </g>
+        <g id="n-append" class="node-box">
+          <rect x="130" y="400" width="180" height="50" rx="6"/>
+          <text x="160" y="425" style="font-size:18px">📝</text>
+          <text x="240" y="418" style="font-size:13px;font-weight:600">结果追加到 messages</text>
+          <text x="240" y="436" style="font-size:11px;fill:#484f58">role: "tool"</text>
+        </g>
+        <g id="n-end" class="node-oval">
+          <rect x="130" y="490" width="180" height="44" rx="22"/>
+          <text x="158" y="512" style="font-size:16px">✅</text>
+          <text x="240" y="512" style="font-size:13px">end_turn · 任务完成</text>
+        </g>
+
+        <path id="e-start" class="edge" d="M220,54 L220,90" marker-end="url(#ah)"/>
+        <path id="e-llm-decide" class="edge" d="M220,140 L220,175" marker-end="url(#ah)"/>
+        <path id="e-decide-tool" class="edge" d="M220,275 L220,310" marker-end="url(#ah)"/>
+        <text id="el-decide-tool" class="edge-label-yes" x="236" y="296">YES</text>
+        <path id="e-tool-append" class="edge" d="M220,360 L220,400" marker-end="url(#ah)"/>
+        <path id="e-decide-end" class="edge" d="M330,225 L390,225 L390,512 L310,512" marker-end="url(#ah)"/>
+        <text id="el-decide-end" class="edge-label-no" x="362" y="215">NO</text>
+        <path id="e-loop" class="edge-loop" d="M130,425 L60,425 L60,115 L130,115" marker-end="url(#ah)"/>
+        <text id="el-loop" x="46" y="270" style="fill:#30363d;font-size:12px;font-weight:700;text-anchor:middle;writing-mode:vertical-lb;transition:fill .5s">↻ 回到 LLM</text>
+      </svg>
+    </div>
+    <div class="status-bar" id="status">
+      <span style="color:#8b949e">⏸  等待启动…</span>
+    </div>
+    <div class="turn-counter">
+      步骤：<span class="num" id="step-num">-</span> / <span id="step-total">10</span>
+      &nbsp;&nbsp;|&nbsp;&nbsp; 轮次：<span class="num" id="turn-num">0</span> / 4
+    </div>
+  </div>
+
+  <!-- 右：Tabs（对话历史 / API 请求） -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="title">详情面板</span>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="chat">
+        <span class="tab-icon">💬</span> 对话历史
+      </div>
+      <div class="tab" data-tab="api">
+        <span class="tab-icon">📡</span> API 请求 <span style="color:#484f58;font-size:11px;margin-left:4px">（随步骤变化）</span>
+      </div>
+    </div>
+
+    <div class="tab-content active" data-tab-content="chat">
+      <div class="chat" id="chat"></div>
+    </div>
+
+    <div class="tab-content" data-tab-content="api">
+      <div class="api-view" id="api-view">
+        <div class="api-empty">
+          👆 点击「下一步」开始演示<br>
+          这里会实时显示每一步发送给 Claude API 的请求体和模型返回
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button id="btn-prev">◀ 上一步</button>
+  <button id="btn-next">下一步 ▶</button>
+  <button id="btn-play">▶▶ 自动播放</button>
+  <button id="btn-reset">↺ 重置</button>
+</div>
+
+<script>
+// ====== DOM ======
+const chat = document.getElementById('chat');
+const apiView = document.getElementById('api-view');
+const status = document.getElementById('status');
+const turnNum = document.getElementById('turn-num');
+const stepNum = document.getElementById('step-num');
+
+// ====== Tab 切换 ======
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelector(`[data-tab-content="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+// ====== 流程节点/边 ======
+const allNodes = ['n-start','n-llm','n-decide','n-tool','n-append','n-end'];
+const allEdges = ['e-start','e-llm-decide','e-decide-tool','e-tool-append','e-decide-end','e-loop'];
+
+function clearHL() {
+  allNodes.forEach(id => document.getElementById(id).classList.remove('active','done'));
+  allEdges.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('active','done');
+    el.setAttribute('marker-end', 'url(#ah)');
+  });
+  document.getElementById('e-loop').setAttribute('marker-end','url(#ah-loop)');
+  document.getElementById('e-loop').classList.remove('active');
+  ['el-decide-tool','el-decide-end','el-loop'].forEach(id =>
+    document.getElementById(id).classList.remove('active'));
+}
+function setNodes(mode, ids) { ids.forEach(id => document.getElementById(id).classList.add(mode)); }
+function setEdges(mode, ids, loopEdges) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.add(mode);
+    el.setAttribute('marker-end', mode === 'active' ? 'url(#ah-active)' :
+                                   mode === 'done' ? 'url(#ah-done)' : 'url(#ah)');
+  });
+  (loopEdges || []).forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.add('active');
+    el.setAttribute('marker-end','url(#ah-loop)');
+  });
+}
+function setLabels(ids) { ids.forEach(id => document.getElementById(id).classList.add('active')); }
+function setStatus(html) { status.innerHTML = html; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function addMsg(role, badge, bodyHtml) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + role;
+  div.innerHTML = `
+    <div class="msg-head"><span class="badge">${badge}</span>${role.toUpperCase()}</div>
+    <div class="msg-body">${bodyHtml}</div>`;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+// ====== JSON 语法高亮 ======
+function highlightJSON(obj, highlightPath) {
+  const jsonStr = JSON.stringify(obj, null, 2);
+  const lines = jsonStr.split('\n');
+
+  // 简单语法高亮
+  const highlighted = lines.map((line, idx) => {
+    let hl = line
+      .replace(/"([^"]+)"(\s*:)/g, '<span class="json-key">"$1"</span>$2')
+      .replace(/:\s*"([^"]*)"/g, ': <span class="json-str">"$1"</span>')
+      .replace(/:\s*(\d+)/g, ': <span class="json-num">$1</span>')
+      .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
+      .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>');
+    return hl;
+  });
+  return highlighted.join('\n');
+}
+
+// ====== Tools 定义（整个演示共享） ======
+const TOOLS = [
+  {
+    name: "read_file",
+    description: "读取项目目录下一个文件的内容。返回带行号的文本，默认最多 2000 行。",
+    input_schema: {
+      type: "object",
+      properties: {
+        file_path: { type: "string", description: "文件的绝对路径" },
+        offset: { type: "integer", description: "起始行号（1-based）" },
+        limit: { type: "integer", description: "要读取的行数，默认 2000" }
+      },
+      required: ["file_path"]
+    }
+  },
+  {
+    name: "edit_file",
+    description: "在文件中做精确的字符串替换。old_string 必须在文件中唯一匹配。",
+    input_schema: {
+      type: "object",
+      properties: {
+        file_path: { type: "string", description: "文件的绝对路径" },
+        old_string: { type: "string", description: "要被替换的原始文本" },
+        new_string: { type: "string", description: "替换后的新文本" },
+        replace_all: { type: "boolean", description: "是否替换所有匹配项，默认 false" }
+      },
+      required: ["file_path", "old_string", "new_string"]
+    }
+  },
+  {
+    name: "run_tests",
+    description: "执行测试命令并返回 stdout/stderr 和退出码。",
+    input_schema: {
+      type: "object",
+      properties: {
+        command: { type: "string", description: "要执行的测试命令" },
+        cwd: { type: "string", description: "命令的工作目录" },
+        timeout_seconds: { type: "integer", description: "超时时间，默认 120" }
+      },
+      required: ["command"]
+    }
+  }
+];
+
+// ====== API 视图更新 ======
+function setApiView(sections) {
+  if (!sections || sections.length === 0) {
+    apiView.innerHTML = `<div class="api-empty">👆 点击「下一步」开始演示<br>这里会实时显示每一步发送给 Claude API 的请求体和模型返回</div>`;
+    return;
+  }
+  apiView.innerHTML = sections.map(sec => `
+    <div class="api-section">
+      <div class="api-section-head">
+        <span class="method">${sec.method}</span>
+        <span class="url">${sec.url}</span>
+        <span class="tag">${sec.tag || ''}</span>
+      </div>
+      ${sec.blocks.map(block => `
+        <div class="api-block">
+          <div class="api-block-head">
+            <span class="label">${block.label}</span>
+            ${block.badge ? `<span style="background:${block.badge.color};color:white;padding:1px 6px;border-radius:3px;font-size:10px;">${block.badge.text}</span>` : ''}
+            <button class="copy-btn" onclick="copyJSON(this, ${JSON.stringify(JSON.stringify(block.data)).replace(/"/g, '&quot;')})">复制</button>
+          </div>
+          <pre class="api-json">${highlightJSON(block.data)}</pre>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function copyJSON(btn, data) {
+  navigator.clipboard.writeText(data).then(() => {
+    btn.textContent = '✓ 已复制';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '复制';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// ====== 剧本 ======
+const script = [
+  // 0. 用户输入
+  {
+    apply() {
+      stepNum.textContent = '1'; turnNum.textContent = '0';
+      clearHL();
+      setNodes('active', ['n-start']);
+      setEdges('active', ['e-start']);
+      setStatus('<span style="color:#79c0ff">●</span> 用户输入任务 → 注入 messages[0]');
+      addMsg('user', 'TASK', '帮我把 <code>src/tax.py</code> 里的 <code>calc_tax</code> 加上 5000 元免税额度。改完跑下测试。');
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 1 · 初始请求',
+        blocks: [
+          {
+            label: 'Request Body',
+            badge: { text: '发出去', color: '#1f6feb' },
+            data: {
+              model: "claude-opus-5",
+              max_tokens: 2048,
+              messages: [
+                { role: "user", content: "帮我把 src/tax.py 里的 calc_tax 加上 5000 元免税额度。改完跑下测试。" }
+              ],
+              tools: TOOLS,
+              tool_choice: { type: "auto" }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() { this.apply(); }
+  },
+
+  // 1. LLM turn 1 → 返回 tool_use(read_file)
+  {
+    apply() {
+      stepNum.textContent = '2'; turnNum.textContent = '1';
+      clearHL();
+      setNodes('done', ['n-start']);
+      setNodes('active', ['n-llm']);
+      setEdges('done', ['e-start']);
+      setStatus('<span style="color:#d2a8ff">●</span> <b>Turn 1</b>：LLM 返回 tool_use → read_file');
+      addMsg('assistant', 'TURN 1',
+        `让我先看看文件内容。
+        <div class="tool-call">
+          <div><span class="fn">read_file</span>(<span class="args"><span class="str">"src/tax.py"</span></span>)</div>
+        </div>`);
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 2 · 模型响应',
+        blocks: [
+          {
+            label: 'Response',
+            badge: { text: 'stop_reason: tool_use', color: '#d2a8ff' },
+            data: {
+              id: "msg_01A2B3C4",
+              type: "message",
+              role: "assistant",
+              content: [
+                { type: "text", text: "让我先看看文件内容。" },
+                { type: "tool_use", id: "toolu_01X7k9", name: "read_file", input: { file_path: "src/tax.py" } }
+              ],
+              model: "claude-opus-5",
+              stop_reason: "tool_use",
+              usage: { input_tokens: 1234, output_tokens: 42 }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '2'; turnNum.textContent = '1';
+      clearHL();
+      setNodes('done', ['n-start']);
+      setEdges('done', ['e-start']);
+      setNodes('active', ['n-llm']);
+      setStatus('<div class="spinner"></div> <b>Turn 1</b>：LLM 分析任务…');
+      await sleep(1100);
+      this.apply();
+    }
+  },
+
+  // 2. 判断 YES → tool
+  {
+    apply() {
+      stepNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-llm']);
+      setNodes('active', ['n-decide','n-tool']);
+      setEdges('done', ['e-start','e-llm-decide']);
+      setEdges('active', ['e-decide-tool']);
+      setLabels(['el-decide-tool']);
+      setStatus('<span style="color:#3fb950">●</span> <b>YES</b> → 执行 read_file');
+    },
+    async animate() {
+      stepNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-llm']);
+      setEdges('done', ['e-start','e-llm-decide']);
+      setNodes('active', ['n-decide']);
+      setStatus('<span style="color:#ff7b72">●</span> 🔀 判断：有 tool_calls 吗？');
+      await sleep(700);
+      setNodes('done', ['n-decide']);
+      setNodes('active', ['n-tool']);
+      setEdges('active', ['e-decide-tool']);
+      setLabels(['el-decide-tool']);
+      setStatus('<span style="color:#3fb950">●</span> <b>YES</b> → 🔧 执行工具');
+    }
+  },
+
+  // 3. 工具返回 + 追加 + 回环 + 下一轮请求
+  {
+    apply() {
+      stepNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-start','n-llm','n-decide','n-tool']);
+      setNodes('active', ['n-append']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool','e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      addMsg('tool', 'RESULT', escapeHtml(`def calc_tax(income):
+    """计算个人所得税"""
+    return income * 0.2
+
+def calc_social(salary):
+    return salary * 0.105`));
+      setStatus('<span style="color:#f0883e">●</span> 📝 追加结果 → ↻ 回到 LLM');
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 4 · 发送下一轮请求（带 tool_result）',
+        blocks: [
+          {
+            label: 'Request Body（完整 messages 历史）',
+            badge: { text: '新增 tool_result', color: '#3fb950' },
+            data: {
+              model: "claude-opus-5",
+              max_tokens: 2048,
+              messages: [
+                { role: "user", content: "帮我把 src/tax.py 里的 calc_tax 加上 5000 元免税额度。改完跑下测试。" },
+                { role: "assistant", content: [
+                  { type: "text", text: "让我先看看文件内容。" },
+                  { type: "tool_use", id: "toolu_01X7k9", name: "read_file", input: { file_path: "src/tax.py" } }
+                ]},
+                { role: "user", content: [
+                  { type: "tool_result", tool_use_id: "toolu_01X7k9",
+                    content: "1  def calc_tax(income):\n2      return income * 0.2\n3\n4  def calc_social(salary):\n5      return salary * 0.105" }
+                ]}
+              ],
+              tools: TOOLS,
+              tool_choice: { type: "auto" }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-start','n-llm','n-decide','n-tool']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool']);
+      setNodes('active', ['n-append']);
+      setEdges('active', ['e-tool-append']);
+      setStatus('<span style="color:#7ee787">●</span> 📝 工具返回 → 追加到 messages');
+      addMsg('tool', 'RESULT', escapeHtml(`def calc_tax(income):
+    """计算个人所得税"""
+    return income * 0.2
+
+def calc_social(salary):
+    return salary * 0.105`));
+      await sleep(900);
+      setNodes('done', ['n-append']);
+      setEdges('done', ['e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      setStatus('<span style="color:#f0883e">●</span> <b>↻ 回到 LLM</b> — 看 API tab 查看完整请求体');
+    }
+  },
+
+  // 4. LLM turn 2 → edit_file
+  {
+    apply() {
+      stepNum.textContent = '5'; turnNum.textContent = '2';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append']);
+      setNodes('active', ['n-llm']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setStatus('<span style="color:#d2a8ff">●</span> <b>Turn 2</b>：LLM 返回 tool_use → edit_file');
+      addMsg('assistant', 'TURN 2',
+        `用 old/new 精确匹配替换：
+        <div class="tool-call">
+          <div><span class="fn">edit_file</span>(<span class="args">
+            <span class="kw">old</span>=<span class="str">"return income * 0.2"</span><br>
+            <span class="kw">new</span>=<span class="str">"return max(0, (income-5000)*0.2)"</span>
+          </span>)</div>
+        </div>`);
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 5 · 模型响应',
+        blocks: [
+          {
+            label: 'Response',
+            badge: { text: 'stop_reason: tool_use', color: '#d2a8ff' },
+            data: {
+              id: "msg_02C4D5E6",
+              type: "message",
+              role: "assistant",
+              content: [
+                { type: "text", text: "用 old/new 精确匹配替换：" },
+                { type: "tool_use", id: "toolu_02Y8m3", name: "edit_file",
+                  input: {
+                    file_path: "src/tax.py",
+                    old_string: "return income * 0.2",
+                    new_string: "return max(0, (income - 5000) * 0.2)"
+                  }
+                }
+              ],
+              model: "claude-opus-5",
+              stop_reason: "tool_use",
+              usage: { input_tokens: 1580, output_tokens: 68 }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '5'; turnNum.textContent = '2';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setNodes('active', ['n-llm']);
+      setStatus('<div class="spinner"></div> <b>Turn 2</b>：LLM 看到代码，构造 diff…');
+      await sleep(1100);
+      this.apply();
+    }
+  },
+
+  // 5. 判断 YES → edit
+  {
+    apply() {
+      stepNum.textContent = '6';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm']);
+      setNodes('active', ['n-decide','n-tool']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setEdges('active', ['e-llm-decide','e-decide-tool']);
+      setLabels(['el-decide-tool']);
+      setStatus('<span style="color:#3fb950">●</span> <b>YES</b> → 执行 edit_file → 写入磁盘');
+    },
+    async animate() {
+      stepNum.textContent = '6';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setNodes('active', ['n-decide']);
+      setEdges('active', ['e-llm-decide']);
+      setStatus('<span style="color:#ff7b72">●</span> 🔀 判断：有 tool_calls 吗？');
+      await sleep(700);
+      setNodes('done', ['n-decide']);
+      setNodes('active', ['n-tool']);
+      setEdges('active', ['e-decide-tool']);
+      setLabels(['el-decide-tool']);
+      setStatus('<span style="color:#3fb950">●</span> <b>YES</b> → 🔧 edit_file');
+    }
+  },
+
+  // 6. edit 返回 → 追加 → 回环
+  {
+    apply() {
+      stepNum.textContent = '7';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setNodes('active', ['n-append']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool','e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      addMsg('tool', 'RESULT', escapeHtml(`- return income * 0.2
++ return max(0, (income - 5000) * 0.2)
+✓ 1 replacement in src/tax.py`));
+      setStatus('<span style="color:#f0883e">●</span> edit 成功 → ↻ 回到 LLM');
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 7 · 发送下一轮请求',
+        blocks: [
+          {
+            label: 'Request Body（messages 继续增长）',
+            badge: { text: '3 轮对话', color: '#3fb950' },
+            data: {
+              model: "claude-opus-5",
+              max_tokens: 2048,
+              messages: [
+                { role: "user", content: "帮我把 src/tax.py 里的 calc_tax 加上 5000 元免税额度。改完跑下测试。" },
+                { role: "assistant", content: [
+                  { type: "text", text: "让我先看看文件内容。" },
+                  { type: "tool_use", id: "toolu_01X7k9", name: "read_file", input: { file_path: "src/tax.py" } }
+                ]},
+                { role: "user", content: [
+                  { type: "tool_result", tool_use_id: "toolu_01X7k9",
+                    content: "1  def calc_tax(income):\n2      return income * 0.2\n..." }
+                ]},
+                { role: "assistant", content: [
+                  { type: "text", text: "用 old/new 精确匹配替换：" },
+                  { type: "tool_use", id: "toolu_02Y8m3", name: "edit_file",
+                    input: { file_path: "src/tax.py", old_string: "return income * 0.2", new_string: "return max(0, (income - 5000) * 0.2)" }}
+                ]},
+                { role: "user", content: [
+                  { type: "tool_result", tool_use_id: "toolu_02Y8m3",
+                    content: "- return income * 0.2\n+ return max(0, (income - 5000) * 0.2)\n✓ 1 replacement in src/tax.py" }
+                ]}
+              ],
+              tools: TOOLS,
+              tool_choice: { type: "auto" }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '7';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool']);
+      setNodes('active', ['n-append']);
+      setEdges('active', ['e-tool-append']);
+      addMsg('tool', 'RESULT', escapeHtml(`- return income * 0.2
++ return max(0, (income - 5000) * 0.2)
+✓ 1 replacement in src/tax.py`));
+      setStatus('<span style="color:#7ee787">●</span> 📝 追加结果');
+      await sleep(900);
+      setNodes('done', ['n-append']);
+      setEdges('done', ['e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      setStatus('<span style="color:#f0883e">●</span> <b>↻ 回到 LLM</b> — 第 2 次循环完成');
+    }
+  },
+
+  // 7. LLM turn 3 → run_tests
+  {
+    apply() {
+      stepNum.textContent = '8'; turnNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setNodes('active', ['n-llm']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setStatus('<span style="color:#d2a8ff">●</span> <b>Turn 3</b>：LLM 决定跑测试 → tool_use(run_tests)');
+      addMsg('assistant', 'TURN 3',
+        `改完了，跑测试验证：
+        <div class="tool-call">
+          <div><span class="fn">run_tests</span>(<span class="args"><span class="str">"pytest tests/test_tax.py -v"</span></span>)</div>
+        </div>`);
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 8 · 模型响应',
+        blocks: [
+          {
+            label: 'Response',
+            badge: { text: 'stop_reason: tool_use', color: '#d2a8ff' },
+            data: {
+              id: "msg_03E5F6G7",
+              type: "message",
+              role: "assistant",
+              content: [
+                { type: "text", text: "改完了，跑测试验证：" },
+                { type: "tool_use", id: "toolu_03Z9p4", name: "run_tests",
+                  input: { command: "pytest tests/test_tax.py -v", timeout_seconds: 120 }
+                }
+              ],
+              model: "claude-opus-5",
+              stop_reason: "tool_use",
+              usage: { input_tokens: 1820, output_tokens: 58 }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '8'; turnNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setNodes('active', ['n-llm']);
+      setStatus('<div class="spinner"></div> <b>Turn 3</b>：跑测试…');
+      await sleep(1100);
+      this.apply();
+    }
+  },
+
+  // 8. 测试返回 → 回环
+  {
+    apply() {
+      stepNum.textContent = '9'; turnNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setNodes('active', ['n-append']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool','e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      addMsg('tool', 'RESULT', escapeHtml(`$ pytest tests/test_tax.py -v
+test_below_threshold PASSED
+test_above_threshold PASSED
+test_edge_case_5000   PASSED
+==== 4 passed in 0.12s ====`));
+      setStatus('<span style="color:#f0883e">●</span> 测试通过 → ↻ 回到 LLM');
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 9 · 发送下一轮请求',
+        blocks: [
+          {
+            label: 'Request Body（messages 继续增长）',
+            badge: { text: '4 轮对话', color: '#3fb950' },
+            data: {
+              model: "claude-opus-5",
+              max_tokens: 2048,
+              messages: [
+                { role: "user", content: "帮我把 src/tax.py 里的 calc_tax 加上 5000 元免税额度。改完跑下测试。" },
+                { role: "assistant", content: [{ type: "tool_use", id: "toolu_01X7k9", name: "read_file", input: { file_path: "src/tax.py" }}] },
+                { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_01X7k9", content: "..." }]},
+                { role: "assistant", content: [{ type: "tool_use", id: "toolu_02Y8m3", name: "edit_file", input: { file_path: "src/tax.py", old_string: "return income * 0.2", new_string: "return max(0, (income - 5000) * 0.2)" }}] },
+                { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_02Y8m3", content: "✓ 1 replacement" }]},
+                { role: "assistant", content: [{ type: "tool_use", id: "toolu_03Z9p4", name: "run_tests", input: { command: "pytest tests/test_tax.py -v" }}] },
+                { role: "user", content: [{ type: "tool_result", tool_use_id: "toolu_03Z9p4", content: "4 passed in 0.12s" }]}
+              ],
+              tools: TOOLS,
+              tool_choice: { type: "auto" }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '9'; turnNum.textContent = '3';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setEdges('done', ['e-start','e-llm-decide','e-decide-tool']);
+      setNodes('active', ['n-append']);
+      setEdges('active', ['e-tool-append']);
+      addMsg('tool', 'RESULT', escapeHtml(`$ pytest tests/test_tax.py -v
+test_below_threshold PASSED
+test_above_threshold PASSED
+test_edge_case_5000   PASSED
+==== 4 passed in 0.12s ====`));
+      setStatus('<span style="color:#7ee787">●</span> 📝 追加结果');
+      await sleep(900);
+      setNodes('done', ['n-append']);
+      setEdges('done', ['e-tool-append']);
+      setEdges('active', [], ['e-loop']);
+      document.getElementById('el-loop').classList.add('active');
+      setStatus('<span style="color:#f0883e">●</span> <b>↻ 回到 LLM</b> — 第 3 次循环完成');
+    }
+  },
+
+  // 9. LLM turn 4 → 无 tool_calls → NO → END
+  {
+    apply() {
+      stepNum.textContent = '10'; turnNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append','n-llm','n-decide']);
+      setNodes('active', ['n-end']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setEdges('active', ['e-llm-decide','e-decide-end']);
+      setLabels(['el-decide-end']);
+      setStatus('<span style="color:#3fb950">✓</span> <b>Turn 4</b>：stop_reason = end_turn → ✅ 任务完成！');
+      addMsg('assistant', 'FINAL',
+        `✅ 已完成。
+
+修改了 <code>src/tax.py</code> 的 <code>calc_tax</code>：
+  <span class="diff-old">- return income * 0.2</span>
+  <span class="diff-new">+ return max(0, (income - 5000) * 0.2)</span>
+
+4 个测试全部通过。`);
+
+      setApiView([{
+        method: 'POST',
+        url: '/v1/messages',
+        tag: 'Step 10 · 最终响应',
+        blocks: [
+          {
+            label: 'Response（关键区别：stop_reason = end_turn）',
+            badge: { text: '✅ 任务完成', color: '#3fb950' },
+            data: {
+              id: "msg_04H7I8J9",
+              type: "message",
+              role: "assistant",
+              content: [
+                { type: "text", text: "✅ 已完成。\n\n修改了 src/tax.py 的 calc_tax：\n- return income * 0.2\n+ return max(0, (income - 5000) * 0.2)\n\n4 个测试全部通过。" }
+              ],
+              model: "claude-opus-5",
+              stop_reason: "end_turn",
+              usage: { input_tokens: 2100, output_tokens: 86 }
+            }
+          }
+        ]
+      }]);
+    },
+    async animate() {
+      stepNum.textContent = '10'; turnNum.textContent = '4';
+      clearHL();
+      setNodes('done', ['n-start','n-tool','n-append']);
+      setEdges('done', ['e-start','e-decide-tool','e-tool-append']);
+      setNodes('active', ['n-llm']);
+      setStatus('<div class="spinner"></div> <b>Turn 4</b>：LLM 总结…');
+      await sleep(1100);
+      setNodes('done', ['n-llm']);
+      setNodes('active', ['n-decide']);
+      setEdges('active', ['e-llm-decide']);
+      setStatus('<span style="color:#ff7b72">●</span> 🔀 判断：有 tool_calls 吗？');
+      await sleep(900);
+      setNodes('done', ['n-decide']);
+      setEdges('done', ['e-llm-decide']);
+      setEdges('active', ['e-decide-end']);
+      setLabels(['el-decide-end']);
+      setStatus('<span style="color:#ff7b72">●</span> <b>NO</b> → 退出循环 → ✅ end_turn');
+      await sleep(700);
+      setNodes('done', ['n-end']);
+      setStatus('<span style="color:#3fb950">✓</span> <b>stop_reason = "end_turn"</b> · 任务完成！');
+      addMsg('assistant', 'FINAL',
+        `✅ 已完成。
+
+修改了 <code>src/tax.py</code> 的 <code>calc_tax</code>：
+  <span class="diff-old">- return income * 0.2</span>
+  <span class="diff-new">+ return max(0, (income - 5000) * 0.2)</span>
+
+4 个测试全部通过。`);
+      this.apply();
+    }
+  }
+];
+
+// ====== 控制 ======
+let currentStep = -1;
+let playing = false;
+let cancelled = false;
+
+function hardReset() {
+  chat.innerHTML = '';
+  clearHL();
+  setStatus('<span style="color:#8b949e">⏸  等待启动…</span>');
+  stepNum.textContent = '-';
+  turnNum.textContent = '0';
+  currentStep = -1;
+  setApiView(null);
+}
+
+function replayTo(n) {
+  hardReset();
+  for (let i = 0; i <= n; i++) script[i].apply();
+  currentStep = n;
+  updateButtons();
+}
+
+function nextStep() {
+  if (currentStep >= script.length - 1) return;
+  stopPlay();
+  currentStep++;
+  script[currentStep].apply();
+  updateButtons();
+}
+
+function prevStep() {
+  stopPlay();
+  if (currentStep <= 0) { hardReset(); updateButtons(); return; }
+  replayTo(currentStep - 1);
+}
+
+function updateButtons() {
+  document.getElementById('btn-prev').disabled = currentStep < 0;
+  document.getElementById('btn-next').disabled = currentStep >= script.length - 1;
+}
+
+async function play() {
+  if (playing) return;
+  playing = true; cancelled = false;
+  document.getElementById('btn-play').textContent = '⏸ 暂停';
+  const startFrom = currentStep + 1;
+  for (let i = startFrom; i < script.length; i++) {
+    if (cancelled) break;
+    currentStep = i;
+    updateButtons();
+    await script[i].animate();
+    if (cancelled) break;
+    if (i < script.length - 1) await sleep(800);
+  }
+  playing = false; cancelled = false;
+  document.getElementById('btn-play').textContent = '▶▶ 自动播放';
+  updateButtons();
+}
+
+function stopPlay() {
+  if (playing) {
+    cancelled = true; playing = false;
+    document.getElementById('btn-play').textContent = '▶▶ 自动播放';
+  }
+}
+
+function reset() { stopPlay(); hardReset(); updateButtons(); }
+
+document.getElementById('btn-prev').onclick = prevStep;
+document.getElementById('btn-next').onclick = nextStep;
+document.getElementById('btn-play').onclick = () => {
+  if (playing) { stopPlay(); updateButtons(); } else play();
+};
+document.getElementById('btn-reset').onclick = reset;
+
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextStep(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep(); }
+  else if (e.key === 'r' || e.key === 'R') reset();
+  else if (e.key === 'p' || e.key === 'P') {
+    if (playing) { stopPlay(); updateButtons(); } else play();
+  }
+});
+
+updateButtons();
+</script>
+</body>
+</html>
